@@ -1,69 +1,214 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState } from "react";
+import { AnalogGrain } from "@/components/AnalogGrain";
+import { StartScreen } from "@/components/StartScreen";
+import { TemplateBrowser } from "@/components/TemplateBrowser";
+import { CaptureScreen, CapturedShotItem } from "@/components/CaptureScreen";
+import { SlotEditor } from "@/components/SlotEditor";
+import { FinishScreen } from "@/components/FinishScreen";
+import { useCameraCapture } from "@/hooks/useCameraCapture";
+import { FRAME_TEMPLATES, FrameTemplate } from "@/lib/templates";
+import { StickerItem } from "@/lib/stickers";
+import { CardCaption } from "@/hooks/useKioskCanvasExport";
+import { MascotProvider } from "@/context/MascotContext";
+import { MascotWidget } from "@/components/MascotWidget";
+
+type BoothScreen = "start" | "browse" | "capture" | "editor" | "finish";
 
 export default function Home() {
+  const [currentScreen, setCurrentScreen] = useState<BoothScreen>("start");
+  const [selectedTemplate, setSelectedTemplate] = useState<FrameTemplate>(
+    FRAME_TEMPLATES[3] || FRAME_TEMPLATES[0]
+  );
+
+  // Photos pool: photoId -> dataUrl
+  const [photos, setPhotos] = useState<Record<string, string>>({});
+
+  // Slot assignment: slotIndex -> photoId
+  const [slotMap, setSlotMap] = useState<Record<number, string>>({});
+
+  // Non-destructive filter state
+  const [globalFilterId, setGlobalFilterId] = useState<string>("none");
+  const [photoFilters, setPhotoFilters] = useState<Record<string, string>>({});
+
+  // Sticker state: array of { id, type, x, y, rotation, scale, color }
+  const [stickers, setStickers] = useState<StickerItem[]>([]);
+
+  // Card caption state
+  const [caption, setCaption] = useState<CardCaption>({
+    enabled: false,
+    text: "",
+    color: "#17140F",
+    bgColor: "#FFFFFF",
+  });
+
+  const camera = useCameraCapture();
+
+  // 1. From Start Screen -> Go to Template Browser
+  const handleStartBooth = () => {
+    camera.setDemoMode(false);
+    setCurrentScreen("browse");
+  };
+
+  const handleTryDemo = () => {
+    camera.setDemoMode(true);
+    setCurrentScreen("browse");
+  };
+
+  // 2. From Template Browser -> Select Template & Proceed to Capture
+  const handleSelectTemplate = (template: FrameTemplate) => {
+    setSelectedTemplate(template);
+    setCurrentScreen("capture");
+  };
+
+  const handleBackToStart = () => {
+    camera.stopCamera();
+    setCurrentScreen("start");
+  };
+
+  // 3. From Capture Screen -> Populate Photos and Initial Slot Map in Capture Order
+  const handleCaptureComplete = (shots: CapturedShotItem[]) => {
+    const newPhotos: Record<string, string> = { ...photos };
+    const newSlotMap: Record<number, string> = {};
+    const newPhotoFilters: Record<string, string> = { ...photoFilters };
+
+    shots.forEach((shot, idx) => {
+      newPhotos[shot.id] = shot.dataUrl;
+      newSlotMap[idx] = shot.id;
+      if (shot.filterId && shot.filterId !== "none") {
+        newPhotoFilters[shot.id] = shot.filterId;
+      }
+    });
+
+    setPhotos(newPhotos);
+    setSlotMap(newSlotMap);
+    setPhotoFilters(newPhotoFilters);
+    camera.stopCamera();
+    setCurrentScreen("editor");
+  };
+
+  const handleCancelCapture = () => {
+    camera.stopCamera();
+    setCurrentScreen("browse");
+  };
+
+  // 4. In Slot Editor -> Adding Retaken Single Photo
+  const handleAddNewPhoto = (newPhoto: CapturedShotItem) => {
+    setPhotos((prev) => ({ ...prev, [newPhoto.id]: newPhoto.dataUrl }));
+    if (newPhoto.filterId && newPhoto.filterId !== "none") {
+      setPhotoFilters((prev) => ({ ...prev, [newPhoto.id]: newPhoto.filterId }));
+    }
+  };
+
+  const handleUpdatePhotoFilter = (photoId: string, filterId: string) => {
+    setPhotoFilters((prev) => ({ ...prev, [photoId]: filterId }));
+  };
+
+  // 5. Navigation Between Editor and Finish
+  const handleProceedToFinish = () => {
+    setCurrentScreen("finish");
+  };
+
+  const handleBackToCapture = () => {
+    setCurrentScreen("capture");
+  };
+
+  const handleEditAgain = () => {
+    setCurrentScreen("editor");
+  };
+
+  const handleStartOver = () => {
+    setPhotos({});
+    setSlotMap({});
+    setPhotoFilters({});
+    setStickers([]);
+    setGlobalFilterId("none");
+    setCaption({
+      enabled: false,
+      text: "",
+      color: "#17140F",
+      bgColor: "#FFFFFF",
+    });
+    setCurrentScreen("browse");
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <MascotProvider>
+      <div className="relative min-h-[100dvh] w-full bg-[#F6F1E7] text-[#17140F] selection:bg-[#FF6B4A] selection:text-white">
+        {/* Subtle Analog Grain Overlay */}
+        <AnalogGrain />
+
+        {/* Mascot Companion ("Blip") */}
+        <MascotWidget />
+
+        {/* Screen 1: Start Screen */}
+        {currentScreen === "start" && (
+          <StartScreen
+            onStart={handleStartBooth}
+            onTryDemo={handleTryDemo}
+          />
+        )}
+
+        {/* Screen 2: Template & Category Browser */}
+        {currentScreen === "browse" && (
+          <TemplateBrowser
+            onSelectTemplate={handleSelectTemplate}
+            onBack={handleBackToStart}
+          />
+        )}
+
+        {/* Screen 3: Capture Screen (Dynamic Slots 3, 4, 8, 16) */}
+        {currentScreen === "capture" && (
+          <CaptureScreen
+            camera={camera}
+            totalSlots={selectedTemplate.slotCount}
+            templateName={selectedTemplate.name}
+            onComplete={handleCaptureComplete}
+            onCancel={handleCancelCapture}
+            isDemoMode={camera.isDemoMode}
+          />
+        )}
+
+        {/* Screen 4: Slot-Based Editor */}
+        {currentScreen === "editor" && (
+          <SlotEditor
+            template={selectedTemplate}
+            photos={photos}
+            slotMap={slotMap}
+            camera={camera}
+            isDemoMode={camera.isDemoMode}
+            onUpdateSlotMap={setSlotMap}
+            onAddNewPhoto={handleAddNewPhoto}
+            globalFilterId={globalFilterId}
+            onChangeGlobalFilter={setGlobalFilterId}
+            photoFilters={photoFilters}
+            onChangePhotoFilter={handleUpdatePhotoFilter}
+            stickers={stickers}
+            onChangeStickers={setStickers}
+            caption={caption}
+            onChangeCaption={setCaption}
+            onProceedToFinish={handleProceedToFinish}
+            onBackToCapture={handleBackToCapture}
+          />
+        )}
+
+        {/* Screen 5: Finish & Download Keepsake Card */}
+        {currentScreen === "finish" && (
+          <FinishScreen
+            template={selectedTemplate}
+            photos={photos}
+            slotMap={slotMap}
+            globalFilterId={globalFilterId}
+            photoFilters={photoFilters}
+            stickers={stickers}
+            caption={caption}
+            onEditAgain={handleEditAgain}
+            onStartOver={handleStartOver}
+          />
+        )}
+      </div>
+    </MascotProvider>
   );
 }
+
