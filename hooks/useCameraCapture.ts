@@ -34,6 +34,15 @@ export function useCameraCapture(): UseCameraCaptureReturn {
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const [permissionState, setPermissionState] = useState<
+    "prompt" | "granted" | "denied" | "unsupported"
+  >("prompt");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [isMirrored, setIsMirrored] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
   const videoRef = useCallback((node: HTMLVideoElement | null) => {
     videoElementRef.current = node;
     if (node && streamRef.current) {
@@ -48,16 +57,7 @@ export function useCameraCapture(): UseCameraCaptureReturn {
         })
         .catch(() => {});
     }
-  }, []);
-
-  const [permissionState, setPermissionState] = useState<
-    "prompt" | "granted" | "denied" | "unsupported"
-  >("prompt");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-  const [isMirrored, setIsMirrored] = useState(true);
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  }, [setIsReady, setPermissionState]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
